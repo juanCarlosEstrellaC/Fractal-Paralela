@@ -34,7 +34,7 @@ public class Ejemplo01Main {
         glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE);
 
         // Create the window
-        window = glfwCreateWindow(Params.WIDTH, Params.HEIGHT, "Ejemplo 01!", NULL, NULL);
+        window = glfwCreateWindow(Params.WIDTH, Params.HEIGHT, "Deber Fractales - Juan Estrella", NULL, NULL);
 
         if (window == NULL)
             throw new RuntimeException("Failed to create the GLFW window");
@@ -111,7 +111,7 @@ public class Ejemplo01Main {
     }
 
     static void loop() {
-        glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
+        glClearColor(0.0f, 0.0f, 0.0f, 0.0f); //color de fondo negro
 
         while (!glfwWindowShouldClose(window)) {
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -129,49 +129,90 @@ public class Ejemplo01Main {
     static int pixel_buffer[] = new int[Params.WIDTH*Params.HEIGHT]; // size= WIDTHxHEIGHT
 
     static void mandelbrotCpu() {
+        int iteracionesMaximas = 2;
+        double radioEscape = 2;
 
-        int clColor = 0x00FF0000;
+        int colorDentro = 0x00000000; // Negro
+        int colorFuera = 0x00FFFFFF;  // Blanco
 
-        for(int i=0;i<Params.WIDTH;i++) {
-            for(int j=0;j<Params.HEIGHT;j++) {
-                //clColor = new Random().nextInt() % 255;
-                //pixel_buffer[j*Params.WIDTH+i] = clColor;
+        for (int px = 0; px < Params.WIDTH; px++) {
+            for (int py = 0; py < Params.HEIGHT; py++) {
+                int iteracion = 0;
 
-                clColor = i * 255 / Params.WIDTH;
+                // zn = x + y*i       -> zn   es número complejo de la forma z = a + b*i
+                // zn+1 = (zn)^2 + c  -> zn+1 es número complejo de la forma zn+1 = (a + b*i)^2 + (a0 + b0*i), donde c es otro complejo.
+                // c = x0 + y0*i
 
-                pixel_buffer[j*Params.WIDTH+i] = clColor;        //red
-                //pixel_buffer[j*Params.WIDTH+i] = clColor << 8; //green
-                //pixel_buffer[j*Params.WIDTH+i] = clColor << 16; //blue
+                // zn = x + y*i, donde z0 = 0
+                double x = 0;
+                double y = 0;
+
+                // Mapear coordenadas del píxel al plano complejo para obtener "c"
+                // c = x0 + y0*i
+                double x0 = map(px, 0, Params.WIDTH, -2.0, 1.0);
+                double y0 = map(py, 0, Params.HEIGHT, -1.5, 1.5);
+
+                // si ( ||zn|| <= 4         y  i < N ), i.e.:
+                // si ( ||x^2 + y^2|| <= 4  y  i < N )
+                while (x * x + y * y <= radioEscape * radioEscape && iteracion < iteracionesMaximas) {
+                    // zn+1 = (zn)^2 + c
+                    // zn+1 = (x + y*i)^2 + c
+                    // zn+1 = (x^2 + 2*x*y*i + (y*i)^2) + c
+                    // zn+1 = (x^2 - y^2) + (2*x*y)*i + c    ya que (y*i)^2 = -y^2 por i^2 = -1
+                    // zn+1 = (x^2 - y^2) + (2*x*y)*i + (x0 + y0*i)
+                    // zn+1 = (x^2 - y^2 + x0) + (2*x*y + y0)*i
+
+                    // La parte real de zn+1 es: x^2 - y^2 + x0
+                    // La parte imaginaria de zn+1 es: 2*x*y + y0
+
+                    // uso temporales para hacer los calculos sin sobrescribir las variables previo a usarlas
+                    // en la formula
+                    double xtemp = x * x - y * y + x0;
+                    double ytemp = 2 * x * y + y0;
+                    //Luego de aplicar, ya actualizo
+                    x = xtemp;
+                    y = ytemp;
+                    iteracion++;
+                }
+
+                // Determinar color basado en el número de iteraciones
+                // para acceder al pixel correcto en el vector, el índice = fila x ancho x columna
+                if (iteracion < iteracionesMaximas) {
+                    pixel_buffer[py * Params.WIDTH + px] = colorFuera;
+                } else {
+                    pixel_buffer[py * Params.WIDTH + px] = colorDentro;
+                }
             }
         }
 
-        //dibujar
+        // Dibujar los píxeles como textura
         glEnable(GL_TEXTURE_2D);
         glBindTexture(GL_TEXTURE_2D, textureID);
-        glTexImage2D(GL_TEXTURE_2D,
-                0,
-                GL_RGBA,
-                Params.WIDTH, Params.HEIGHT, 0,
-                GL_RGBA,
-                GL_UNSIGNED_BYTE,
-                pixel_buffer);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, Params.WIDTH, Params.HEIGHT, 0, GL_RGBA, GL_UNSIGNED_BYTE, pixel_buffer);
 
         glBegin(GL_QUADS);
         {
-            glTexCoord2f(0,1);
+            glTexCoord2f(0, 1);
             glVertex3f(-1, -1, 0);
 
-            glTexCoord2f(0,0);
+            glTexCoord2f(0, 0);
             glVertex3f(-1, 1, 0);
 
-            glTexCoord2f(1,0);
+            glTexCoord2f(1, 0);
             glVertex3f(1, 1, 0);
 
-            glTexCoord2f(1,1);
+            glTexCoord2f(1, 1);
             glVertex3f(1, -1, 0);
         }
         glEnd();
     }
+
+    // Función para mapear valores de un rango a otro
+    static double map(int valor, int inicio1, int fin1, double inicio2, double fin2) {
+        return inicio2 + (fin2 - inicio2) * ((double) valor - inicio1) / (fin1 - inicio1);
+    }
+
+
     //--------------------------------------------------------------------------------
 
     static void paint() {
